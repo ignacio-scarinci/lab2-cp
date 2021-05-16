@@ -12,7 +12,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <gsl/gsl_rng.h>
+
+#include "mt64.h"
 
 char t1[] = "(https://omlc.ogi.edu)";
 char t2[] = "1 W Point Source Heating in Infinite Isotropic Scattering Medium";
@@ -29,7 +30,7 @@ static float heat2[SHELLS];
  * Photon
  ***/
 
-static void photon(const gsl_rng * r)
+static void photon(void)
 {
     const float albedo = MU_S / (MU_S + MU_A);
     const float shells_per_mfp = 1e4 / MICRONS_PER_SHELL / (MU_A + MU_S);
@@ -44,7 +45,7 @@ static void photon(const gsl_rng * r)
     float weight = 1.0f;
 
     for (;;) {
-        float t = -logf(gsl_rng_uniform (r)); /* move */
+        float t = -logf(genrand64_real1()); /* move */
         x += t * u;
         y += t * v;
         z += t * w;
@@ -60,8 +61,8 @@ static void photon(const gsl_rng * r)
         /* New direction, rejection method */
         float xi1, xi2;
         do {
-            xi1 = 2.0f * gsl_rng_uniform (r) - 1.0f;
-            xi2 = 2.0f * gsl_rng_uniform (r) - 1.0f;
+            xi1 = 2.0f * genrand64_real1() - 1.0f;
+            xi2 = 2.0f * genrand64_real1() - 1.0f;
             t = xi1 * xi1 + xi2 * xi2;
         } while (1.0f < t);
         u = 2.0f * t - 1.0f;
@@ -69,13 +70,12 @@ static void photon(const gsl_rng * r)
         w = xi2 * sqrtf((1.0f - u * u) / t);
 
         if (weight < 0.001f) { /* roulette */
-            if (gsl_rng_uniform (r) > 0.1f)
+            if (genrand64_real1() > 0.1f)
                 break;
             weight /= 0.1f;
         }
     }
 }
-
 
 /***
  * Main matter
@@ -83,9 +83,6 @@ static void photon(const gsl_rng * r)
 
 int main(void)
 {
-    const gsl_rng_type * T;
-    gsl_rng * r;
-       
     // heading
     printf("# %s\n# %s\n# %s\n", t1, t2, t3);
     printf("# Scattering = %8.3f/cm\n", MU_S);
@@ -93,16 +90,12 @@ int main(void)
     printf("# Photons    = %8d\n#\n", PHOTONS);
 
     // configure RNG
-    gsl_rng_env_setup();
-    T = gsl_rng_mt19937;
-    r = gsl_rng_alloc (T);
-    gsl_rng_set(r, SEED);
-    
+    init_genrand64(SEED);
     // start timer
     double start = wtime();
     // simulation
     for (unsigned long i = 0; i < PHOTONS; ++i) {
-        photon(r);
+        photon();
     }
     // stop timer
     double end = wtime();
@@ -121,7 +114,6 @@ int main(void)
                sqrt(heat2[i] - heat[i] * heat[i] / PHOTONS) / t / (i * i + i + 1.0f / 3.0f));
     }
     printf("# extra\t%12.5f\n", heat[SHELLS - 1] / PHOTONS);
-    
-    gsl_rng_free (r);
+
     return 0;
 }

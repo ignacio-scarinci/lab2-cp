@@ -1,0 +1,16 @@
+Flags: -Ofast -march=native -funroll-loops
+
+GCC: -ftree-vectorize
+     -ftree-slp-vectorize
+     -fsimd-cost-model=unlimited|dynamic|cheap
+     -fopt-info-vec
+     -fopt-info-vec-missed
+Clang:
+     -mllvm -force-vector-width=8
+     -Rpass
+     -Rpass-missed
+     -Rpass-analysis
+ ICC:
+ 
+ 
+ 
