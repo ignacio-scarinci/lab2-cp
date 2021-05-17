@@ -1,4 +1,4 @@
-Flags: -Ofast -march=native -funroll-loops
+Flags: -O2 -march=native -funroll-loops
 
 GCC: -ftree-vectorize
      -ftree-slp-vectorize
