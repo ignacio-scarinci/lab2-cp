@@ -12,6 +12,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <immintrin.h>
 
 #include "mt19937ar.h"
 
@@ -30,52 +31,102 @@ static float heat2[SHELLS];
  * Photon
  ***/
 
-static void photon(void)
+static void photon(uint n_primarios)
 {
-    const __m256 albedo = _mm256_set1_ps MU_S / (MU_S + MU_A);
-    const __m256 shells_per_mfp = _mm256_set1_ps (1e4 / MICRONS_PER_SHELL / (MU_A + MU_S));
-   
+    __m256 albedo = _mm256_set1_ps(MU_S / (MU_S + MU_A));
+    __m256 albedo_1 = _mm256_set1_ps(1.0f - (MU_S / (MU_S + MU_A)));
+    __m256 shells_per_mfp = _mm256_set1_ps (1e4 / MICRONS_PER_SHELL / (MU_A + MU_S));
+    __m256 negativo = _mm256_set1_ps(-1.0f);
+    __m256 shell_ = _mm256_set1_ps(SHELLS -1.0f);
+    unsigned int i;
+    float xi1, xi2, tt;
+    int fotones = 0;
     while (fotones < n_primarios){
+    fotones += 8;
     /* launch */
     __m256 x = _mm256_set1_ps(0.0f);
     __m256 y = _mm256_set1_ps(0.0f);
     __m256 z = _mm256_set1_ps(0.0f);
     __m256 u = _mm256_set1_ps(0.0f);
     __m256 v = _mm256_set1_ps(0.0f);
-    __m256 w = _mm256_set1_ps(0.0f);
-    __m256 weight = _mm256_set1_ps(0.0f);
+    __m256 w = _mm256_set1_ps(1.0f);
+    __m256 weight = _mm256_set1_ps(1.0f);
+    __m256 t = _mm256_set1_ps(0.0f);
 
+    float xi1, xi2, tt;
+    float sumo_parada = 0;
     for (;;) {
-        __m256 aleatorio = __m256_set1_ps(genrand_real1()) /* Arreglar el generador para float*/
-        __m256 t = -1.0 * __m256_log_ps(genrand_real1()); /* move */
-        x += t * u;
-        y += t * v;
-        z += t * w;
+      __m256 aleatorio = _mm256_set_ps(genrand_real1(),
+                               genrand_real1(),
+                               genrand_real1(),
+                               genrand_real1(),
+                               genrand_real1(),
+                               genrand_real1(),
+                               genrand_real1(),
+                               genrand_real1());
+      t = _mm256_mul_ps(negativo, _mm256_log_ps(aleatorio)); /* move */
+      x = _mm256_add_ps(x, _mm256_mul_ps(t, u));
+      y = _mm256_add_ps(y, _mm256_mul_ps(t, v));
+      z = _mm256_add_ps(z, _mm256_mul_ps(t,  w));
 
-        unsigned int shell = sqrtf(x * x + y * y + z * z) * shells_per_mfp; /* absorb */
-        if (shell > SHELLS - 1) {
-            shell = SHELLS - 1;
+      __m256 shell = _mm256_sqrt_ps(_mm256_add_ps(
+                                    _mm256_add_ps(_mm256_mul_ps(x,x),  _mm256_mul_ps(y,y)),
+                                    _mm256_mul_ps(z,z)));
+
+      shell = _mm256_mul_ps(shell, shells_per_mfp);
+
+      shell = _mm256_trunc_ps(shell); /* Trunco el shell para quedarme solo con la parte entera en */
+
+      shell =_mm256_blendv_ps(shell, shell_, _mm256_cmp_ps (shell, shell_, 14 ));
+
+      __m256 calor = _mm256_mul_ps(albedo_1, weight);
+
+      __m256 calor2 = _mm256_mul_ps(calor, calor);
+
+      weight = _mm256_mul_ps(weight, albedo);
+
+      for (uint i=0; i<8; i=i+1){
+          heat[(int)shell[i]] = heat[(int)shell[i]] + calor[i];
+          heat2[(int)shell[i]] = heat2[(int)shell[i]] + calor2[i];
+      }
+
+
+      for (uint i=0; i<8; i = i+1){
+        if (weight[i] < 0.001f && weight[i]>0.0f){
+          if (genrand_real1() > 0.1f){
+             weight[i] = 0;
+             sumo_parada += 1;
+          }
+          else
+             weight[i] /= 0.1f;
         }
-        heat[shell] += (1.0f - albedo) * weight;
-        heat2[shell] += (1.0f - albedo) * (1.0f - albedo) * weight * weight; /* add up squares */
-        weight *= albedo;
+      }
+
+      if (sumo_parada == 8){
+        break;
+      }
 
         /* New direction, rejection method */
-        float xi1, xi2;
+      for (uint i=0; i<8; i=i+1){
         do {
             xi1 = 2.0f * genrand_real1() - 1.0f;
             xi2 = 2.0f * genrand_real1() - 1.0f;
-            t = xi1 * xi1 + xi2 * xi2;
-        } while (1.0f < t);
-        u = 2.0f * t - 1.0f;
-        v = xi1 * sqrtf((1.0f - u * u) / t);
-        w = xi2 * sqrtf((1.0f - u * u) / t);
+            tt = xi1 * xi1 + xi2 * xi2;
+        } while (1.0f < tt);
 
-        if (weight < 0.001f) { /* roulette */
+        u[i] = 2.0f * tt - 1.0f;
+        v[i] = xi1 * sqrtf((1.0f - u[i] * u[i]) / tt);
+        w[i] = xi2 * sqrtf((1.0f - u[i] * u[i]) / tt);
+      }
+
+
+        /* roulette
+        if (weight < 0.001f) {
             if (genrand_real1() > 0.1f)
                 break;
             weight /= 0.1f;
-        }
+        } */
+
       }
     }
 }
@@ -97,9 +148,9 @@ int main(void)
     // start timer
     double start = wtime();
     // simulation
-    for (unsigned long i = 0; i < PHOTONS; ++i) {
-        photon();
-    }
+  //  for (unsigned long i = 0; i < PHOTONS; ++i) {
+    photon(PHOTONS);
+//    }
     // stop timer
     double end = wtime();
     assert(start <= end);
