@@ -38,9 +38,12 @@ static void photon(uint n_primarios)
     __m256 shells_per_mfp = _mm256_set1_ps (1e4 / MICRONS_PER_SHELL / (MU_A + MU_S));
     __m256 negativo = _mm256_set1_ps(-1.0f);
     __m256 shell_ = _mm256_set1_ps(SHELLS -1.0f);
-    unsigned int i;
-    float xi1, xi2, tt;
+    __m256 umbral_w = _mm256_set1_ps(0.001f);
+    __m256 umbral_a = _mm256_set1_ps(0.01f);
+    __m256 factor_ruleta = _mm256_set1_ps(10.0f);
+    __m256 zero =  _mm256_set1_ps(0.0f);
     int fotones = 0;
+
     while (fotones < n_primarios){
     fotones += 8;
     /* launch */
@@ -54,7 +57,7 @@ static void photon(uint n_primarios)
     __m256 t = _mm256_set1_ps(0.0f);
 
     float xi1, xi2, tt;
-    float sumo_parada = 0;
+
     for (;;) {
       __m256 aleatorio = _mm256_set_ps(genrand_real1(),
                                genrand_real1(),
@@ -75,39 +78,37 @@ static void photon(uint n_primarios)
 
       shell = _mm256_mul_ps(shell, shells_per_mfp);
 
-      shell = _mm256_trunc_ps(shell); /* Trunco el shell para quedarme solo con la parte entera en */
-
       shell =_mm256_blendv_ps(shell, shell_, _mm256_cmp_ps (shell, shell_, 14 ));
 
       __m256 calor = _mm256_mul_ps(albedo_1, weight);
 
-      __m256 calor2 = _mm256_mul_ps(calor, calor);
-
       weight = _mm256_mul_ps(weight, albedo);
 
       for (uint i=0; i<8; i=i+1){
-          heat[(int)shell[i]] = heat[(int)shell[i]] + calor[i];
-          heat2[(int)shell[i]] = heat2[(int)shell[i]] + calor2[i];
-      }
+        heat[(int)shell[i]] = heat[(int)shell[i]] + calor[i];
+     }
 
+     __m256 u_w = _mm256_cmp_ps (  weight, umbral_w,1 );
+     int menor = _mm256_movemask_ps(u_w);
 
-      for (uint i=0; i<8; i = i+1){
-        if (weight[i] < 0.001f && weight[i]>0.0f){
-          if (genrand_real1() > 0.1f){
-             weight[i] = 0;
-             sumo_parada += 1;
-          }
-          else
-             weight[i] /= 0.1f;
-        }
-      }
-
-      if (sumo_parada == 8){
+     if (menor > 0){
+       weight = _mm256_blendv_ps(weight, _mm256_mul_ps(weight, factor_ruleta), u_w);
+      __m256 aleatorio = _mm256_set_ps(genrand_real1(),
+                              genrand_real1(),
+                              genrand_real1(),
+                              genrand_real1(),
+                              genrand_real1(),
+                              genrand_real1(),
+                              genrand_real1(),
+                              genrand_real1());
+      __m256 u_a = _mm256_cmp_ps( umbral_a,  aleatorio, 14);
+      weight = _mm256_blendv_ps(weight, zero, u_a);
+      if (_mm256_movemask_ps(weight) == 0){
         break;
       }
-
+    }
         /* New direction, rejection method */
-      for (uint i=0; i<8; i=i+1){
+        for (uint i=0; i<8; i=i+1){
         do {
             xi1 = 2.0f * genrand_real1() - 1.0f;
             xi2 = 2.0f * genrand_real1() - 1.0f;
@@ -118,16 +119,7 @@ static void photon(uint n_primarios)
         v[i] = xi1 * sqrtf((1.0f - u[i] * u[i]) / tt);
         w[i] = xi2 * sqrtf((1.0f - u[i] * u[i]) / tt);
       }
-
-
-        /* roulette
-        if (weight < 0.001f) {
-            if (genrand_real1() > 0.1f)
-                break;
-            weight /= 0.1f;
-        } */
-
-      }
+     }
     }
 }
 
@@ -147,10 +139,14 @@ int main(void)
     init_genrand(SEED);
     // start timer
     double start = wtime();
+    
     // simulation
-  //  for (unsigned long i = 0; i < PHOTONS; ++i) {
     photon(PHOTONS);
-//    }
+
+    for (uint i=0; i<SHELLS; ++i){
+        heat2[i] = heat[i] * heat[i];
+    }
+
     // stop timer
     double end = wtime();
     assert(start <= end);

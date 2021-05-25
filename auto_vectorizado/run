@@ -1,0 +1,22 @@
+#!/bin/bash
+
+echo "GCC SIN"
+echo "======="
+echo " "
+
+./gcc_100k_sin
+echo "======="
+./gcc_1000k_sin
+echo "======="
+./gcc_10000k_sin
+echo "======="
+
+echo "GCC Con"
+echo "======="
+echo " "
+./gcc_100k_con
+echo "======="
+./gcc_1000k_con
+echo "======="
+./gcc_10000k_con
+echo "======="

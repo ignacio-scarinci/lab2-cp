@@ -1,8 +1,4 @@
-Flags: -O2 -march=native -funroll-loops
-
-GCC: -ftree-vectorize
-     -ftree-slp-vectorize
-     -fsimd-cost-model=unlimited|dynamic|cheap
+GCC: -ftree-vectorize 
      -fopt-info-vec
      -fopt-info-vec-missed
 Clang:
@@ -11,6 +7,6 @@ Clang:
      -Rpass-missed
      -Rpass-analysis
  ICC:
+ icc -O2 -qopt-report=1 -qopt-report-phase=vec 
  
- 
- 
+

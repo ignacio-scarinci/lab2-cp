@@ -1,0 +1,34 @@
+Intel(R) Advisor can now assist with vectorization and show optimization
+  report messages with your source code.
+See "https://software.intel.com/en-us/intel-advisor-xe" for details.
+
+Intel(R) C Intel(R) 64 Compiler Classic for applications running on Intel(R) 64, Version 2021.2.0 Build 20210228_000000
+
+Compiler options: -O2 -march=native -qopt-report=5 -qopt-report-phase=vec -o ./auto_vectorizado/clang_100k_con -lm
+
+Begin optimization report for: main(void)
+
+    Report from: Vector optimizations [vec]
+
+
+LOOP BEGIN at tiny_mc_mt.c(111,5)
+   remark #15382: vectorization support: call to function printf(const char *__restrict__, ...) cannot be vectorized   [ tiny_mc_mt.c(112,9) ]
+   remark #15344: loop was not vectorized: vector dependence prevents vectorization
+LOOP END
+
+
+Non-optimizable loops:
+
+
+LOOP BEGIN at tiny_mc_mt.c(97,5)
+   remark #15543: loop was not vectorized: loop with function call not considered an optimization candidate.
+
+   LOOP BEGIN at tiny_mc_mt.c(72,9) inlined into tiny_mc_mt.c(98,9)
+      remark #15543: loop was not vectorized: loop with function call not considered an optimization candidate.
+
+      LOOP BEGIN at tiny_mc_mt.c(67,25) inlined into tiny_mc_mt.c(98,9)
+         remark #15521: loop was not vectorized: loop control variable was not identified. Explicitly compute the iteration count before executing the loop or try using canonical loop form from OpenMP specification
+      LOOP END
+   LOOP END
+LOOP END
+===========================================================================

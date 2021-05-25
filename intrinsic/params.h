@@ -25,4 +25,3 @@
 #ifndef SEED
 #define SEED (time(NULL)) // random seed
 #endif
-
